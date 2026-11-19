@@ -1,0 +1,614 @@
+<title>맞춤형 테이핑 추천</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column in the program's order — 1 선택(유형·종목, 부위, 목적, 상태) → 2 추천 결과 → 3 부착 방법(그림·그래프). Grids inside sections collapse on phones. */
+:root{
+  --bg:#eef2f1; --surface:#ffffff; --surface-2:#f4f7f6; --ink:#14212b; --sub:#55636f; --muted:#8a96a0; --line:#d6dfe2;
+  --accent:#1d6fd8; --accent-soft:#e2edfb; --accent-ink:#0f4c9e;
+  --tape:#1d6fd8; --tape-anchor:#9cc2f2; --tape-s:#fbfaf5; --tape-s-line:#a49d8c; --skin:#f1d7c4; --skin-line:#c79f85;
+  --cut:#d2452f; --bar:#b9c6cf; --bar-none:#dde4e8; --warn-bg:#fff3d8; --warn-ink:#7a4b00; --note-bg:#e9f0f8;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1418; --surface:#162027; --surface-2:#1c2830; --ink:#e4ecf1; --sub:#9aa9b4; --muted:#6f7e89; --line:#2b3943;
+  --accent:#5c9dff; --accent-soft:#1a2f4d; --accent-ink:#a9caff;
+  --tape:#4b8fef; --tape-anchor:#2c4f80; --tape-s:#e9e4d6; --tape-s-line:#8a8372; --skin:#5a463b; --skin-line:#8d6e5c;
+  --cut:#ff7a62; --bar:#4a5a66; --bar-none:#2f3d47; --warn-bg:#3a2c10; --warn-ink:#ffd58a; --note-bg:#1a2633; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1418; --surface:#162027; --surface-2:#1c2830; --ink:#e4ecf1; --sub:#9aa9b4; --muted:#6f7e89; --line:#2b3943;
+  --accent:#5c9dff; --accent-soft:#1a2f4d; --accent-ink:#a9caff;
+  --tape:#4b8fef; --tape-anchor:#2c4f80; --tape-s:#e9e4d6; --tape-s-line:#8a8372; --skin:#5a463b; --skin-line:#8d6e5c;
+  --cut:#ff7a62; --bar:#4a5a66; --bar-none:#2f3d47; --warn-bg:#3a2c10; --warn-ink:#ffd58a; --note-bg:#1a2633; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 48px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{border-bottom:1px solid var(--line);padding-bottom:14px}
+h1{font-size:26px;line-height:1.25;margin:0;font-weight:700;letter-spacing:-0.02em;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--sub);max-width:62ch}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.sec-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.num{font-family:var(--f-mono);font-size:12px;color:var(--accent-ink);background:var(--accent-soft);border-radius:4px;padding:1px 7px}
+h2{font-size:18px;margin:0;font-weight:700;letter-spacing:-0.01em}
+.field{display:flex;flex-direction:column;gap:8px;min-width:0}
+.lab{font-size:13px;color:var(--sub);font-weight:600;letter-spacing:.02em}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer;transition:border-color .15s,background .15s;display:inline-flex;align-items:center;gap:6px}
+.chip:hover{border-color:var(--accent)}
+.chip:focus-visible,.btn:focus-visible,.sp:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip .tag{font-size:11px;font-weight:700;color:var(--accent)}
+.chip[aria-pressed="true"] .tag{color:#d8e7ff}
+.sel-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+@media (max-width:760px){.sel-grid{grid-template-columns:minmax(0,1fr)}}
+.types{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:860px){.types{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:420px){.types{grid-template-columns:minmax(0,1fr)}}
+.type{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--surface-2)}
+.type.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--surface)}
+.type-h{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px}
+.type-h svg{width:22px;height:22px;color:var(--accent);flex:none}
+.sps{display:flex;flex-wrap:wrap;gap:5px}
+.sp{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:3px 9px;cursor:pointer}
+.sp:hover{border-color:var(--accent)}
+.sp[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.type-desc{font-size:14px;color:var(--sub);border-left:3px solid var(--accent);padding:2px 0 2px 12px}
+.type-desc b{color:var(--ink)}
+.res-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.res-grid{grid-template-columns:minmax(0,1fr)}}
+.verdict{border-radius:10px;background:var(--surface-2);border:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:10px}
+.verdict .k{font-size:13px;color:var(--sub);font-weight:600}
+.verdict .big{font-size:32px;font-weight:700;letter-spacing:-0.02em;line-height:1.15}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;background:var(--accent-soft);color:var(--accent-ink)}
+.pill.s{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.kv{display:grid;grid-template-columns:84px minmax(0,1fr);gap:7px 12px;font-size:14px;margin:0}
+.kv dt{color:var(--sub);font-weight:500}
+.kv dd{margin:0}
+.kv .mono{font-family:var(--f-mono);font-weight:500;color:var(--accent-ink)}
+.warn{background:var(--warn-bg);color:var(--warn-ink);border-radius:8px;padding:10px 12px;font-size:14px}
+.note{background:var(--note-bg);border-radius:8px;padding:10px 12px;font-size:14px}
+.side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.side .lab{margin-bottom:-2px}
+.pgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;font-size:13px;background:var(--surface)}
+.pc.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.pc b{font-size:14px}
+.pc span{color:var(--sub)}
+.pc .mono{font-family:var(--f-mono);color:var(--accent-ink);font-size:12px}
+.how{display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1.2fr);gap:16px;align-items:start}
+@media (max-width:800px){.how{grid-template-columns:minmax(0,1fr)}}
+.fig{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.fig h3{font-size:14px;margin:0;font-weight:700}
+.fig .sub{font-size:12px;color:var(--sub)}
+.fig svg{width:100%;height:auto;display:block}
+.figs{display:flex;flex-direction:column;gap:12px;min-width:0}
+.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:420px){.steps{grid-template-columns:minmax(0,1fr)}}
+.st{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;background:var(--surface-2)}
+.st b{font-size:14px}
+.st .n{font-family:var(--f-mono);font-size:12px;color:#fff;background:var(--accent);border-radius:50%;width:22px;height:22px;display:grid;place-items:center}
+.st p{margin:0;font-size:13px;color:var(--sub)}
+.st .val{font-family:var(--f-mono);font-size:13px;color:var(--accent-ink);font-weight:500}
+.manual{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;border-top:1px solid var(--line);padding-top:14px}
+.manual small{color:var(--sub);font-size:12.5px}
+.btn{font:inherit;border-radius:8px;cursor:pointer;background:var(--accent);border:1px solid var(--accent);color:#fff;font-size:15px;padding:10px 18px;text-decoration:none;display:inline-flex}
+.btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.evi{border-top:1px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:12px}
+.evi-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.evi-h b{font-size:16px}
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:620px){.charts{grid-template-columns:minmax(0,1fr)}}
+.chart{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.chart h3{font-size:14px;margin:0;font-weight:700}
+.chart .sub{font-size:12px;color:var(--sub)}
+.chart svg{width:100%;height:auto;display:block}
+.evi p{margin:0;font-size:14px}
+.evi .cav{font-size:12.5px;color:var(--sub)}
+.motion{font-size:12px;color:var(--sub)}
+.motion b{color:var(--ink);font-weight:600}
+#tip{position:fixed;pointer-events:none;z-index:20;background:var(--ink);color:var(--surface);font-size:12.5px;padding:5px 9px;border-radius:6px;max-width:240px;line-height:1.4}
+footer{color:var(--sub);font-size:12.5px;border-top:1px solid var(--line);padding-top:12px}
+@media (prefers-reduced-motion:reduce){.chip{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>맞춤형 테이핑 추천</h1>
+    <p>운동 종목, 부위, 목적, 현재 상태를 고르면 키네시오 테이프와 스포츠 테이프 중 알맞은 테이핑을 추천하고, 붙이는 방법을 그림과 그래프로 보여준다.</p>
+  </header>
+
+  <section class="card" aria-labelledby="h1s">
+    <div class="sec-h"><span class="num">1</span><h2 id="h1s">선택</h2></div>
+    <div class="field">
+      <span class="lab">운동 유형 · 종목</span>
+      <div class="types" id="types"></div>
+      <div class="type-desc" id="typedesc"></div>
+    </div>
+    <div class="field"><span class="lab">부위</span><div class="chips" id="parts"></div></div>
+    <div class="sel-grid">
+      <div class="field"><span class="lab">운동 목적</span><div class="chips" id="purposes"></div></div>
+      <div class="field"><span class="lab">현재 신체 상태</span><div class="chips" id="conds"></div></div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h2s">
+    <div class="sec-h"><span class="num">2</span><h2 id="h2s">추천 결과</h2></div>
+    <div class="res-grid">
+      <div class="verdict" id="verdict" aria-live="polite"></div>
+      <div class="side">
+        <span class="lab" id="pgridLab"></span>
+        <div class="pgrid" id="pgrid"></div>
+        <div class="note" id="typeNote"></div>
+      </div>
+    </div>
+    <div class="evi" id="evi"></div>
+  </section>
+
+  <section class="card" aria-labelledby="h3s">
+    <div class="sec-h"><span class="num">3</span><h2 id="h3s">부착 방법</h2></div>
+    <div class="how">
+      <div class="fig">
+        <h3>붙이는 모양</h3>
+        <div class="sub" id="figSub"></div>
+        <div id="partFig"></div>
+      </div>
+      <div class="figs">
+        <div class="fig">
+          <h3>구간별 장력</h3>
+          <div class="sub">최대 신장 대비 %, 띠는 권장 범위</div>
+          <div id="tensionFig"></div>
+        </div>
+        <div class="fig">
+          <h3>자르는 법</h3>
+          <div class="sub" id="cutSub"></div>
+          <div id="cutFig"></div>
+        </div>
+      </div>
+    </div>
+    <div class="steps" id="steps"></div>
+    <div class="manual">
+      <a class="btn" id="manualBtn" href="#" target="_blank" rel="noopener">테이핑 부착 방법 보기</a>
+      <small id="manualNote"></small>
+    </div>
+  </section>
+
+  <footer>탐구용 프로그램이다. 장력과 방향은 일반적인 키네시오·스포츠 테이핑 지침을 정리한 것이며, 통증이 심하거나 계속되면 테이핑보다 진료가 먼저다.</footer>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+/* ===== 설정: 스마트 매뉴얼(구글 사이트) 주소. 키는 '부위-형태' (예: 'calf-Y') ===== */
+const MANUAL_URL = { 'calf-Y':'', 'calf-I':'', 'calf-Fan':'' };
+
+/* ===== 운동 유형 · 종목 ===== */
+const TYPES = {
+  jump:{name:'점프·착지형', icon:'<path d="M3 20h18M6 17c2-9 10-9 12 0"/><path d="M12 4v6M9.5 6.5 12 4l2.5 2.5"/>', order:['knee','thigh','calf','ankle','back','wrist'],
+    desc:'점프할 때는 엉덩이, 무릎, 발목 관절이 펴지면서 지면을 밀어내고, 착지할 때는 근육이 늘어난 채로 수축하는 신장성 수축으로 충격을 흡수한다. 이 움직임이 반복되면 대퇴사두근과 종아리 근육에 부하가 반복해서 가해진다.',
+    tip:'착지 충격이 반복되므로 경기 전에 테이프 끝이 들뜨지 않았는지 확인한다.'},
+  dir:{name:'방향 전환·민첩성형', icon:'<path d="M3 18l5-9 5 7 5-10"/><path d="M15 6h3v3"/>', order:['ankle','knee','calf','thigh','back','wrist'],
+    desc:'빠른 가속과 감속, 급정지, 좌우 방향 전환이 반복된다. 한쪽 다리에 체중이 집중되는 경우가 많아 발목과 무릎 관절의 안정성이 중요하며, 종아리와 엉덩이 주변 근육이 균형 유지에 관여한다.',
+    tip:'급정지와 방향 전환 때 발목이 바깥쪽으로 꺾이는 염좌가 흔하므로 발목 안정에 신경 쓴다.'},
+  rep:{name:'반복적 근수축형', icon:'<path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M17 3v4h-4"/>', order:['calf','thigh','knee','ankle','back','wrist'],
+    desc:'같거나 비슷한 동작을 반복하며 근육의 수축과 이완이 계속된다. 종아리 근육이 반복해서 힘을 내므로 운동이 길어질수록 부하가 누적되어 피로가 생기고 수행 능력이 떨어질 수 있다.',
+    tip:'땀이 많이 나므로 운동 20~30분 전에 붙이고, 붙이기 전에 피부의 땀과 유분을 닦아 둔다.'},
+  rot:{name:'회전·체중 이동형', icon:'<path d="M5 12a7 7 0 1 0 2-5"/><path d="M4 4v4h4"/><circle cx="12" cy="12" r="1.5"/>', order:['ankle','back','wrist','calf','knee','thigh'],
+    desc:'몸통 회전과 체중 이동으로 하체의 힘을 상체로 전달한다. 종아리 근육은 체중 이동 중 발목의 안정성과 균형을 유지하며, 회전 방향에 따라 하체에 가해지는 부하가 달라진다.',
+    tip:'회전할 때 피부가 비틀리므로 테이프 끝을 둥글게 자르고 앵커를 충분히 남긴다.'}
+};
+const SPORTS = [['농구','dir'],['축구','dir'],['야구','rot',['wrist']],['배구','jump'],['헬스','rep',['back','wrist']],['마라톤','rep'],['킨볼','dir'],['배드민턴','jump',['wrist']],
+  ['테니스','dir',['wrist']],['탁구','dir',['wrist']],['골프','rot',['wrist']],['태권도','rot'],['복싱','rot',['wrist']],['검도','dir',['wrist']],['줄넘기','jump',['calf','ankle']]];
+const PARTS = {calf:'종아리', ankle:'발목', knee:'무릎', thigh:'허벅지', back:'허리', wrist:'손목'};
+const PURPOSES = {relief:'통증 완화', prevent:'부상 예방', swelling:'부기 감소', correct:'관절 교정'};
+const CONDS = {none:'특별한 불편함 없음', issue:'통증 또는 피부 자극 있음'};
+
+/* ===== 테이프 형태 ===== */
+const SHAPE = {
+  I:{name:'I형',kind:'line',cut:'I'}, Y:{name:'Y형',kind:'line',cut:'Y'}, Fan:{name:'Fan형',kind:'line',cut:'Fan'},
+  kStirrup:{name:'I형 등자형(U자)',kind:'center',cut:'center'}, kU:{name:'I형 U자 교정',kind:'line',cut:'I'},
+  stirrupS:{name:'앵커 + 등자(스터럽)',kind:'sport',cut:'sport'}, kneeS:{name:'앵커 + 양옆 X자 지지',kind:'sport',cut:'sport'}, rings:{name:'원형 감기',kind:'sport',cut:'sport'},
+  donut:{name:'도넛형',kind:'ring',cut:'donut'}, hI:{name:'가로 I형',kind:'line',cut:'I'}, hband:{name:'가로 I형(감싸기)',kind:'line',cut:'I'},
+  H:{name:'H형',kind:'H',cut:'H'}, X:{name:'X형',kind:'center',cut:'X'}, twoI:{name:'I형 두 줄',kind:'line',cut:'twoI'}
+};
+/* 장력 구간: [시작%, 끝%, 최소, 최대, 이름] */
+const Z = {
+  line:(a,b,n='몸통')=>[[0,12,0,0,'시작 앵커'],[12,88,a,b,n],[88,100,0,0,'끝 앵커']],
+  y:(a,b,c,d)=>[[0,10,0,0,'시작 앵커'],[10,38,a,b,'몸통'],[38,90,c,d,'두 갈래'],[90,100,0,0,'끝 앵커']],
+  yrev:(a,b,c,d)=>[[0,10,0,0,'시작 앵커'],[10,62,c,d,'두 갈래'],[62,90,a,b,'몸통'],[90,100,0,0,'끝 앵커']],
+  fan:(b)=>[[0,15,0,0,'시작 앵커'],[15,90,0,b,'네 가닥'],[90,100,0,0,'끝 앵커']],
+  center:(a,b)=>[[0,12,0,0,'끝 앵커'],[12,50,a,b,'중앙 → 한쪽'],[50,88,a,b,'중앙 → 반대쪽'],[88,100,0,0,'끝 앵커']],
+  ring:(a,b)=>[[0,100,a,b,'둘레 전체']]
+};
+const POS = {
+  calf:'엎드리거나 벽을 짚고 서서 발끝을 몸쪽으로 당긴다. 종아리가 늘어난 상태에서 붙인다.',
+  ankle90:'의자에 앉아 발목을 90°로 세운다.',
+  ankleFan:'발목을 안쪽으로 살짝 돌려 바깥 복사뼈 주변 피부를 늘린다.',
+  knee90:'의자에 앉아 무릎을 90° 정도 굽힌다.',
+  knee30:'무릎을 살짝(약 30°) 굽힌다.',
+  thigh:'선 채로 발뒤꿈치를 엉덩이 쪽으로 당겨 허벅지 앞쪽을 늘린다.',
+  back:'선 채로 허리를 앞으로 숙여 허리 근육을 늘린다.',
+  backStraight:'허리를 곧게 펴고 바르게 선다. 교정하려는 자세 그대로 붙인다.',
+  wristK:'팔을 앞으로 뻗고 손목을 아래로 꺾어 아래팔 위쪽을 늘린다.',
+  wristS:'손가락을 벌리고 손목을 편하게 편다. 피가 통하지 않을 만큼 세게 감지 않는다.',
+  wristN:'손목을 곧게 편 상태로 손바닥을 아래로 향한다.'
+};
+/* 추천 규칙: 부위 × 목적 */
+const RULES = {
+  calf:{
+    relief:{tape:'K',shape:'Y',zones:Z.y(10,20,10,25),from:'발뒤꿈치',to:'무릎 뒤 아래',dir:'발뒤꿈치 → 무릎 뒤 아래 (근육 이완 방향)',pos:'calf',len:'35~40 cm',why:'비복근 두 갈래를 약한 장력으로 감싸 근육의 긴장을 줄인다.'},
+    prevent:{tape:'K',shape:'Y',rev:true,zones:Z.yrev(15,25,25,35),from:'무릎 뒤 아래',to:'발뒤꿈치',dir:'무릎 뒤 아래(두 갈래) → 발뒤꿈치 (근육 수축 보조 방향)',pos:'calf',len:'35~40 cm',why:'근육이 수축하는 방향으로 붙여 반복 동작에서 종아리 근육을 보조한다.'},
+    swelling:{tape:'K',shape:'Fan',zones:Z.fan(20),from:'발뒤꿈치',to:'종아리 위쪽',dir:'발뒤꿈치 앵커 → 종아리 위쪽으로 부채꼴',pos:'calf',len:'30~35 cm',why:'가닥 사이 피부가 들리며 부기가 빠지고 림프 순환이 원활해진다고 알려져 있다.'},
+    correct:{tape:'K',shape:'I',zones:Z.line(25,50,'아킬레스건 따라'),from:'발뒤꿈치',to:'무릎 뒤 아래',dir:'발뒤꿈치 → 무릎 뒤 아래 (아킬레스건을 따라)',pos:'calf',len:'35~40 cm',why:'아킬레스건과 종아리 가운데를 따라 발목 정렬을 세로로 잡아 준다.'}
+  },
+  ankle:{
+    relief:{tape:'K',shape:'kStirrup',zones:Z.center(25,50),from:'발뒤꿈치 아래 중앙',to:'복사뼈 위',dir:'발뒤꿈치 아래 중앙 → 양옆 위로',pos:'ankle90',len:'30~35 cm',why:'복사뼈 양옆을 감싸 발목을 가볍게 지지하고 통증 부위 피부를 들어 올린다.'},
+    prevent:{tape:'S',shape:'stirrupS',zones:null,from:'안쪽',to:'바깥쪽',dir:'앵커 2줄을 먼저 감고, 등자는 안쪽에서 시작해 발뒤꿈치 아래를 지나 바깥쪽으로 당겨 올린다.',pos:'ankle90',len:'롤에서 25~30 cm씩',why:'발목이 바깥쪽으로 꺾이는 움직임을 막아 염좌를 예방한다.',
+      labels:[['앵커 2줄 감기','종아리 아래 둘레'],['등자 붙이기','안쪽 → 발뒤꿈치 아래'],['바깥쪽 마무리','늘리지 않는 테이프']],
+      steps:[['앵커 감기','종아리 아래쪽 둘레에 앵커 2줄을 감는다.'],['등자 붙이기','안쪽 앵커에서 시작해 발뒤꿈치 아래를 지난다.'],['당겨 올리기','바깥쪽으로 당겨 올려 앵커에 붙이고, 두 번째 등자를 절반 겹쳐 붙인다.']]},
+    swelling:{tape:'K',shape:'Fan',zones:Z.fan(20),from:'종아리 아래 바깥쪽',to:'복사뼈 주변',dir:'종아리 아래 바깥쪽 앵커 → 복사뼈 주변으로 부채꼴',pos:'ankleFan',len:'20~25 cm',why:'복사뼈 주변에 고인 부기가 빠지도록 넓게 나눠 붙인다.'},
+    correct:{tape:'K',shape:'kU',zones:Z.line(50,75,'발뒤꿈치 아래'),from:'안쪽',to:'바깥쪽',dir:'안쪽에서 시작해 발뒤꿈치 아래를 지나 바깥쪽으로 당겨 올린다.',pos:'ankle90',len:'30~35 cm',why:'발목이 안쪽으로 꺾이지 않도록 발의 정렬을 바깥쪽으로 잡아 준다.'}
+  },
+  knee:{
+    relief:{tape:'K',shape:'donut',zones:Z.ring(15,25),from:'무릎뼈 위',to:'한 바퀴',dir:'무릎뼈 위에서 시작해 둘레를 따라 한 바퀴',pos:'knee90',len:'25~30 cm',why:'무릎뼈 둘레의 피부를 들어 올려 통증 부위의 압력을 줄인다.',
+      labels:[['시작','무릎뼈 위'],['둘레 따라 붙이기','15~25%'],['한 바퀴 마무리','끝을 살짝 겹치기']]},
+    prevent:{tape:'K',shape:'Y',zones:Z.y(15,25,25,50),from:'정강이 위쪽',to:'무릎뼈 위',dir:'정강이 위쪽 앵커 → 무릎뼈 양옆을 감싸 허벅지 쪽으로',pos:'knee90',len:'25~30 cm',why:'무릎뼈 양옆을 감싸 점프·착지와 방향 전환 때 무릎을 안정시킨다.'},
+    swelling:{tape:'K',shape:'Fan',zones:Z.fan(20),from:'허벅지 아래쪽',to:'정강이 위쪽',dir:'허벅지 아래쪽 앵커 → 무릎 아래로 부채꼴',pos:'knee90',len:'25~30 cm',why:'무릎 전체에 가닥을 넓게 펼쳐 부기가 빠지도록 돕는다.'},
+    correct:{tape:'K',shape:'hI',zones:Z.line(50,75,'무릎뼈 위'),from:'무릎 바깥쪽',to:'무릎 안쪽',dir:'무릎뼈 바깥쪽 → 안쪽으로 당겨 붙이기',pos:'knee30',len:'20~25 cm',why:'무릎뼈가 바깥쪽으로 치우치지 않도록 안쪽으로 당겨 정렬을 돕는다.'}
+  },
+  thigh:{
+    relief:{tape:'K',shape:'Y',rev:true,zones:Z.yrev(10,20,15,25),from:'무릎뼈 양옆',to:'허벅지 위쪽',dir:'무릎뼈 양옆(두 갈래) → 허벅지 위쪽 (근육 이완 방향)',pos:'thigh',len:'35~45 cm',why:'근육 이완 방향으로 약하게 붙여 뭉친 허벅지 근육의 긴장을 줄인다.'},
+    prevent:{tape:'K',shape:'Y',zones:Z.y(15,25,25,50),from:'허벅지 위쪽',to:'무릎뼈 아래',dir:'허벅지 위쪽 → 무릎뼈 양옆을 감싸 아래로 (근육 수축 보조 방향)',pos:'thigh',len:'35~45 cm',why:'대퇴사두근 전체를 감싸 착지 충격을 받는 허벅지를 보조한다.'},
+    swelling:{tape:'K',shape:'Fan',zones:Z.fan(20),from:'허벅지 위쪽',to:'무릎 위',dir:'허벅지 위쪽 앵커 → 아래로 부채꼴',pos:'thigh',len:'35~40 cm',why:'허벅지 앞쪽에 가닥을 넓게 펼쳐 부기가 빠지도록 돕는다.'},
+    correct:{tape:'K',shape:'I',zones:Z.line(25,50,'허벅지 가운데'),from:'허벅지 위쪽',to:'무릎뼈 위',dir:'허벅지 위쪽 → 무릎뼈 위',pos:'thigh',len:'35~40 cm',why:'허벅지 가운데를 따라 무릎뼈가 위아래로 바르게 움직이도록 돕는다.'}
+  },
+  back:{
+    relief:{tape:'K',shape:'X',zones:Z.center(25,50),from:'아픈 지점',to:'바깥쪽',dir:'아픈 지점(교차점) → 네 방향 바깥쪽',pos:'back',len:'25 cm 2장',why:'아픈 지점을 중심으로 교차시켜 그 부위 피부를 들어 올린다.'},
+    prevent:{tape:'K',shape:'H',zones:Z.line(25,50,'세로·가로 줄'),from:'엉덩이 바로 위',to:'등',dir:'세로 두 줄은 엉덩이 바로 위 → 등 쪽으로, 가로 한 줄은 가운데 → 양옆',pos:'back',len:'세로 25~30 cm 2장, 가로 20 cm 1장',why:'척추 양옆 근육을 세로로, 허리 둘레를 가로로 함께 잡아 회전 동작에서 허리를 안정시킨다.',
+      labels:[['세로 두 줄','아래 → 위, 25~50%'],['가로 한 줄','가운데부터 양옆으로'],['끝 앵커','장력 0%']]},
+    swelling:{tape:'K',shape:'Fan',zones:Z.fan(20),from:'허리 옆쪽',to:'척추 쪽',dir:'허리 옆쪽 앵커 → 척추 쪽으로 부채꼴',pos:'back',len:'25~30 cm',why:'허리 근육 위에 가닥을 넓게 펼쳐 부기가 빠지도록 돕는다.'},
+    correct:{tape:'K',shape:'twoI',zones:Z.line(50,75,'척추 양옆'),from:'엉덩이 바로 위',to:'등',dir:'엉덩이 바로 위 → 등 쪽으로 (허리를 편 자세에서)',pos:'backStraight',len:'25~30 cm 2장',why:'허리를 곧게 편 상태로 붙여 몸이 구부러질 때 피부가 당겨지며 바른 자세를 의식하게 한다.'}
+  },
+  wrist:{
+    relief:{tape:'K',shape:'Y',zones:Z.y(10,20,15,25),from:'손등',to:'아래팔 위쪽',dir:'손등 → 아래팔 위쪽 (근육 이완 방향)',pos:'wristK',len:'20~25 cm',why:'아래팔 근육을 약한 장력으로 감싸 손목 주변 통증을 줄인다.'},
+    prevent:{tape:'S',shape:'rings',zones:null,from:'손 쪽',to:'팔꿈치 쪽',dir:'손목 둘레를 한 방향으로, 손 쪽에서 팔꿈치 쪽으로 절반씩 겹쳐 감는다.',pos:'wristS',len:'롤에서 바로 감기',why:'손목이 과하게 꺾이지 않게 고정해 펀치·스윙 충격에서 손목을 보호한다.',
+      labels:[['첫 바퀴','손 쪽'],['절반씩 겹쳐 감기','2~3바퀴'],['마지막 바퀴','팔꿈치 쪽']],
+      steps:[['첫 바퀴','손목 주름 바로 위에 한 바퀴 감는다.'],['겹쳐 감기','앞 줄과 절반씩 겹치며 팔꿈치 쪽으로 감는다.'],['마무리','2~3바퀴 감고 끝을 눌러 붙인다. 손가락 끝 색이 변하면 다시 감는다.']]},
+    swelling:{tape:'K',shape:'Fan',zones:Z.fan(20),from:'아래팔 위쪽',to:'손등',dir:'아래팔 위쪽 앵커 → 손등 쪽으로 부채꼴',pos:'wristK',len:'20~25 cm',why:'손목과 손등에 가닥을 넓게 펼쳐 부기가 빠지도록 돕는다.'},
+    correct:{tape:'K',shape:'hband',zones:Z.line(25,50,'손목 둘레 반 바퀴'),from:'손목 바깥쪽',to:'손목 안쪽',dir:'손목 바깥쪽 → 손등을 지나 안쪽으로 감싸기',pos:'wristN',len:'15~20 cm',why:'손목 관절을 둘레 방향으로 감싸 관절이 흔들리지 않게 정렬한다.'}
+  }
+};
+
+/* ===== 측정 결과: 운동 유형별 대표 동작 (종아리 · 키네시오 테이핑) =====
+   rate: 회복률(%) = (3단계 운동 직후 - 휴식 1분 후) / (3단계 운동 직후 - 처음) x 100
+   inc : 운동 중 심박수 증가율 평균(%)  */
+const MEASURE = {
+  rep:{motion:'카프레이즈', rate:{None:52.63,I:78.26,Y:54.17,Fan:70}, inc:{None:29.74,I:12.13,Y:14.06,Fan:9.38}, valid:true},
+  jump:{motion:'제자리 점프', rate:{None:31.82,I:50.85,Y:9.09,Fan:20.31}, inc:{None:73.34,I:56.53,Y:61.04,Fan:47.36}, valid:true},
+  dir:{motion:'사이드스텝', rate:{None:42.56,I:47.14,Y:52.38,Fan:79.66}, inc:{None:77.77,I:52.12,Y:40.11,Fan:45.38}, valid:true},
+  rot:{motion:'제자리걷기', rate:{None:145.95,I:134.62,Y:78.05,Fan:226.67}, inc:{None:41.77,I:17.51,Y:23.25,Fan:8.03}, valid:false}
+};
+const MNAME={None:'무테이핑',I:'I형',Y:'Y형',Fan:'Fan형'};
+function measuredBest(tk){ const m=MEASURE[tk]; if(!m.valid) return null; return ['I','Y','Fan'].sort((a,b)=>m.rate[b]-m.rate[a])[0]; }
+/* 측정 결과로 정해지는 종아리 형태 (통증 완화·부상 예방) */
+const CALF_MEASURED = {
+  relief:{
+    I:{tape:'K',shape:'I',zones:Z.line(15,25,'아킬레스건 따라'),from:'발뒤꿈치',to:'무릎 뒤 아래',dir:'발뒤꿈치 → 무릎 뒤 아래 (근육 이완 방향)',pos:'calf',len:'35~40 cm',why:'종아리 가운데를 따라 약한 장력으로 붙여 근육의 긴장을 줄인다.'},
+    Fan:{tape:'K',shape:'Fan',zones:Z.fan(20),from:'발뒤꿈치',to:'종아리 위쪽',dir:'발뒤꿈치 앵커 → 종아리 위쪽으로 부채꼴',pos:'calf',len:'30~35 cm',why:'가닥을 넓게 펼쳐 피부를 들어 올리고 순환을 도와, 피로한 종아리의 회복을 돕는다.'}
+  },
+  prevent:{
+    I:{tape:'K',shape:'I',rev:true,zones:Z.line(25,35,'아킬레스건 따라'),from:'무릎 뒤 아래',to:'발뒤꿈치',dir:'무릎 뒤 아래 → 발뒤꿈치 (근육 수축 보조 방향)',pos:'calf',len:'35~40 cm',why:'종아리 가운데를 따라 근육이 수축하는 방향으로 붙여 반복 동작을 보조한다.'},
+    Fan:{tape:'K',shape:'Fan',zones:Z.fan(25),from:'발뒤꿈치',to:'종아리 위쪽',dir:'발뒤꿈치 앵커 → 종아리 위쪽으로 부채꼴',pos:'calf',len:'30~35 cm',why:'가닥을 넓게 펼쳐 종아리 전체를 고르게 감싸, 방향 전환 때 반복되는 부하를 분산한다.'}
+  }
+};
+
+/* ===== 다른 테이프 종류로 하는 방법 (alt) ===== */
+const S_STIRRUP={tape:'S',shape:'stirrupS',zones:null,from:'안쪽',to:'바깥쪽',dir:'앵커 2줄을 먼저 감고, 등자는 안쪽에서 시작해 발뒤꿈치 아래를 지나 바깥쪽으로 당겨 올린다.',pos:'ankle90',len:'롤에서 25~30 cm씩',
+  labels:RULES.ankle.prevent.labels, steps:RULES.ankle.prevent.steps};
+const S_RINGS={tape:'S',shape:'rings',zones:null,from:'손 쪽',to:'팔꿈치 쪽',dir:'손목 둘레를 한 방향으로, 손 쪽에서 팔꿈치 쪽으로 절반씩 겹쳐 감는다.',pos:'wristS',len:'롤에서 바로 감기',
+  labels:RULES.wrist.prevent.labels, steps:RULES.wrist.prevent.steps};
+const S_KNEE={tape:'S',shape:'kneeS',zones:null,from:'정강이 위',to:'허벅지 아래',dir:'위아래 앵커를 먼저 감고, 무릎 양옆에 X자 지지대를 붙여 앵커끼리 잇는다.',pos:'knee30',len:'롤에서 20~30 cm씩',
+  labels:[['앵커 감기','허벅지 아래·정강이 위'],['양옆 X자 지지대','무릎 안쪽·바깥쪽'],['앵커로 끝 고정','늘리지 않는 테이프']],
+  steps:[['앵커 감기','허벅지 아래와 정강이 위에 앵커를 한 줄씩 감는다.'],['X자 지지대','무릎 양옆에 테이프를 X자로 교차해 위아래 앵커를 잇는다.'],['고정','지지대 끝 위에 앵커를 한 번 더 감아 고정한다.']]};
+RULES.ankle.prevent.alt={tape:'K',shape:'kStirrup',zones:Z.center(50,75),from:'발뒤꿈치 아래 중앙',to:'복사뼈 위',dir:'발뒤꿈치 아래 중앙 → 양옆 위로 (바깥쪽을 더 당기기)',pos:'ankle90',len:'30~35 cm',why:'움직임을 크게 막지 않으면서 발목 양옆을 지지해, 경기 중에도 관절을 자유롭게 쓸 수 있다.'};
+RULES.ankle.relief.alt={...S_STIRRUP,why:'삔 뒤 운동에 복귀할 때 아픈 방향으로 발목이 꺾이지 않게 막아 통증을 줄인다.'};
+RULES.ankle.correct.alt={...S_STIRRUP,why:'늘어나지 않는 등자로 발뒤꿈치를 바깥쪽으로 당겨 안쪽으로 꺾인 발목 자세를 강하게 바로잡는다.'};
+RULES.knee.prevent.alt={...S_KNEE,why:'무릎이 안쪽·바깥쪽으로 꺾이는 움직임을 막아 방향 전환 때 인대 부상을 예방한다.'};
+RULES.knee.correct.alt={...S_KNEE,why:'무릎이 옆으로 흔들리지 않게 고정해 관절을 바른 위치에 붙잡아 둔다.'};
+RULES.wrist.prevent.alt={tape:'K',shape:'hband',zones:Z.line(25,50,'손목 둘레 반 바퀴'),from:'손목 바깥쪽',to:'손목 안쪽',dir:'손목 바깥쪽 → 손등을 지나 안쪽으로 감싸기',pos:'wristN',len:'15~20 cm',why:'손목을 감싸 지지하면서도 손목을 꺾는 동작은 그대로 할 수 있다.'};
+RULES.wrist.relief.alt={...S_RINGS,why:'손목을 움직일 때 아프다면 둘레를 고정해 아픈 방향의 움직임을 줄인다.'};
+RULES.wrist.correct.alt={...S_RINGS,why:'늘어나지 않는 테이프로 손목 둘레를 고정해 관절이 흔들리지 않게 한다.'};
+function noAltReason(part, purpose, tape){
+  if(tape==='K') return '';
+  if(purpose==='swelling') return '늘어나지 않는 테이프는 피부를 들어 올리지 못하고 혈액·림프 흐름을 막을 수 있어 부기 감소에는 쓰지 않는다.';
+  if(['calf','thigh','back'].includes(part)) return '근육 위에 붙이면 근육이 수축·이완할 때 움직임을 막아 쓰지 않는다. 스포츠 테이프는 주로 관절에 쓴다.';
+  return '통증 완화는 피부를 들어 올리는 키네시오 테이프의 역할이라 스포츠 테이프는 쓰지 않는다.';
+}
+
+/* ===== 부위 그림 (2D SVG) ===== */
+const FIG = {
+  calf:{view:'뒤에서 본 오른쪽 종아리', top:'무릎 뒤', bottom:'발뒤꿈치',
+    outline:'M58 20 C50 70,30 110,34 165 C38 215,64 250,72 300 C75 320,72 335,76 350 C80 368,140 368,144 350 C148 335,145 320,148 300 C156 250,182 215,186 165 C190 110,170 70,162 20 Z',
+    deco:'M70 34 Q110 44 150 34 M80 120 Q74 170 96 225 M140 120 Q146 170 124 225 M100 300 L104 245 M120 300 L116 245',
+    shapes:{
+      I:{s:[{d:'M110 356 L110 42',w:28,a:'se'}],p:[[110,346],[110,200],[110,50]]},
+      Y:{s:[{d:'M110 356 L110 214',w:28,a:'s'},{d:'M103 216 C93 170,72 120,76 46',w:13,a:'e'},{d:'M117 216 C127 170,148 120,144 46',w:13,a:'e'}],p:[[110,346],[134,140],[144,54]]},
+      Fan:{s:[{d:'M110 356 L110 288',w:28,a:'s'},{d:'M99 290 C92 220,74 140,66 52',w:6.5,a:'e'},{d:'M106 290 C104 220,98 140,96 52',w:6.5,a:'e'},{d:'M114 290 C116 220,122 140,124 52',w:6.5,a:'e'},{d:'M121 290 C128 220,146 140,154 52',w:6.5,a:'e'}],p:[[110,346],[122,170],[154,60]]}
+    }},
+  ankle:{view:'뒤에서 본 오른쪽 발목 (오른쪽이 바깥쪽)', top:'종아리 아래', bottom:'발뒤꿈치',
+    outline:'M62 20 C58 110,74 200,80 250 C70 262,66 278,74 292 C76 320,82 340,110 344 C138 340,144 320,146 292 C154 278,150 262,140 250 C146 200,162 110,158 20 Z',
+    deco:'M102 330 L104 250 M118 330 L116 250 M74 268 Q66 280 76 292 M146 268 Q154 280 144 292',
+    shapes:{
+      stirrupS:{s:[{d:'M60 62 L160 62',w:18,a:''},{d:'M60 84 L160 84',w:18,a:''},{d:'M70 74 C66 200,74 300,92 348 Q110 360 128 348 C146 300,154 200,150 74',w:18,a:''},{d:'M82 74 C78 200,84 290,98 340 Q110 350 122 340 C136 290,142 200,138 74',w:18,a:''}],p:[[62,62],[72,210],[150,96]]},
+      kStirrup:{s:[{d:'M110 356 Q90 356 84 344 C72 300,66 200,68 60',w:26,a:'e'},{d:'M110 356 Q130 356 136 344 C148 300,154 200,152 60',w:26,a:'e'}],p:[[110,354],[72,220],[152,68]]},
+      kU:{s:[{d:'M68 60 C66 200,72 300,84 344 Q90 356 110 356 Q130 356 136 344 C148 300,154 200,152 60',w:26,a:'se'}],p:[[68,68],[110,356],[152,68]]},
+      Fan:{s:[{d:'M150 34 L148 118',w:26,a:'s'},{d:'M139 120 C132 190,114 250,104 300',w:6,a:'e'},{d:'M145 120 C142 190,126 255,118 306',w:6,a:'e'},{d:'M151 120 C150 195,138 255,132 304',w:6,a:'e'},{d:'M157 120 C158 195,150 250,144 296',w:6,a:'e'}],p:[[150,44],[140,200],[132,302]]}
+    }},
+  knee:{view:'앞에서 본 오른쪽 무릎', top:'허벅지', bottom:'정강이',
+    outline:'M56 20 C54 90,62 150,70 190 C72 220,70 250,74 280 C78 320,80 350,82 372 L138 372 C140 350,142 320,146 280 C150 250,148 220,150 190 C158 150,166 90,164 20 Z',
+    deco:'M84 190 a26 30 0 1 0 52 0 a26 30 0 1 0 -52 0 M110 236 L110 300',
+    shapes:{
+      Y:{s:[{d:'M110 362 L110 262',w:26,a:'s'},{d:'M104 264 C82 244,72 210,76 170 C78 130,86 90,90 56',w:12,a:'e'},{d:'M116 264 C138 244,148 210,144 170 C142 130,134 90,130 56',w:12,a:'e'}],p:[[110,352],[78,190],[90,62]]},
+      donut:{s:[{d:'M110 140 A44 50 0 1 1 109.9 140',w:14,a:''}],p:[[110,140],[66,190],[146,160]]},
+      Fan:{s:[{d:'M110 30 L110 92',w:26,a:'s'},{d:'M99 94 C92 160,82 220,80 300',w:6,a:'e'},{d:'M106 94 C104 160,98 230,98 310',w:6,a:'e'},{d:'M114 94 C116 160,122 230,122 310',w:6,a:'e'},{d:'M121 94 C128 160,138 220,140 300',w:6,a:'e'}],p:[[110,40],[100,170],[122,306]]},
+      hI:{s:[{d:'M62 190 L158 190',w:22,a:'se'}],p:[[64,190],[110,190],[156,190]]},
+      kneeS:{s:[{d:'M56 62 L164 62',w:18,a:''},{d:'M78 330 L142 330',w:18,a:''},{d:'M66 72 L90 320',w:14,a:''},{d:'M92 72 L68 320',w:14,a:''},{d:'M154 72 L130 320',w:14,a:''},{d:'M128 72 L152 320',w:14,a:''}],p:[[60,62],[79,196],[140,330]]}
+    }},
+  thigh:{view:'앞에서 본 오른쪽 허벅지', top:'엉덩이 아래', bottom:'무릎',
+    outline:'M50 20 C46 120,58 220,72 290 C76 320,78 345,80 372 L140 372 C142 345,144 320,148 290 C162 220,174 120,170 20 Z',
+    deco:'M86 330 a24 28 0 1 0 48 0 a24 28 0 1 0 -48 0 M80 80 Q90 200 96 290 M140 80 Q130 200 124 290',
+    shapes:{
+      Y:{s:[{d:'M110 30 L110 200',w:28,a:'s'},{d:'M103 198 C86 240,76 290,80 330 C82 350,90 362,98 368',w:13,a:'e'},{d:'M117 198 C134 240,144 290,140 330 C138 350,130 362,122 368',w:13,a:'e'}],p:[[110,40],[82,290],[98,364]]},
+      I:{s:[{d:'M110 30 L110 294',w:28,a:'se'}],p:[[110,40],[110,170],[110,288]]},
+      Fan:{s:[{d:'M110 30 L110 96',w:28,a:'s'},{d:'M99 98 C92 170,82 240,80 296',w:6.5,a:'e'},{d:'M106 98 C104 170,100 240,100 300',w:6.5,a:'e'},{d:'M114 98 C116 170,120 240,120 300',w:6.5,a:'e'},{d:'M121 98 C128 170,138 240,140 296',w:6.5,a:'e'}],p:[[110,40],[104,190],[140,292]]}
+    }},
+  back:{view:'뒤에서 본 허리', top:'등', bottom:'엉덩이',
+    outline:'M30 20 C26 120,24 220,34 330 C40 360,70 372,110 372 C150 372,180 360,186 330 C196 220,194 120,190 20 Z',
+    deco:'M110 24 L110 352 M40 320 Q110 345 180 320',
+    shapes:{
+      H:{s:[{d:'M90 330 L90 50',w:20,a:'se'},{d:'M130 330 L130 50',w:20,a:'se'},{d:'M110 250 L44 250',w:20,a:'e'},{d:'M110 250 L176 250',w:20,a:'e'}],p:[[90,322],[150,250],[130,58]]},
+      X:{s:[{d:'M110 190 L48 92',w:20,a:'e'},{d:'M110 190 L172 92',w:20,a:'e'},{d:'M110 190 L48 292',w:20,a:'e'},{d:'M110 190 L172 292',w:20,a:'e'}],p:[[110,190],[150,126],[170,98]]},
+      twoI:{s:[{d:'M90 330 L90 50',w:20,a:'se'},{d:'M130 330 L130 50',w:20,a:'se'}],p:[[130,322],[130,190],[130,58]]},
+      Fan:{s:[{d:'M34 190 L80 190',w:22,a:'s'},{d:'M82 181 C110 160,140 120,170 100',w:5.5,a:'e'},{d:'M82 187 C112 180,142 162,172 160',w:5.5,a:'e'},{d:'M82 193 C112 200,142 216,172 220',w:5.5,a:'e'},{d:'M82 199 C110 220,140 260,170 280',w:5.5,a:'e'}],p:[[40,190],[126,170],[170,280]]}
+    }},
+  wrist:{view:'손등 쪽에서 본 오른쪽 손목', top:'팔꿈치 쪽', bottom:'손가락',
+    outline:'M74 20 C76 120,82 190,84 230 C76 240,62 258,54 284 C50 296,60 302,70 296 L72 330 C74 350,78 366,84 372 L136 372 C142 366,146 350,148 330 L150 262 C146 246,140 236,136 230 C138 190,144 120,146 20 Z',
+    deco:'M76 334 Q110 342 146 334 M96 340 L96 372 M110 342 L110 372 M124 340 L124 372',
+    shapes:{
+      rings:{s:[{d:'M78 224 L142 224',w:16,a:''},{d:'M78 210 L142 210',w:16,a:''},{d:'M78 196 L142 196',w:16,a:''}],p:[[80,224],[110,210],[140,196]]},
+      Y:{s:[{d:'M110 326 L110 240',w:22,a:'s'},{d:'M104 242 C96 180,90 120,92 36',w:10.5,a:'e'},{d:'M116 242 C124 180,130 120,128 36',w:10.5,a:'e'}],p:[[110,318],[94,150],[92,44]]},
+      Fan:{s:[{d:'M110 28 L110 84',w:22,a:'s'},{d:'M101 86 C96 170,90 250,88 318',w:5,a:'e'},{d:'M107 86 C106 170,102 250,102 322',w:5,a:'e'},{d:'M113 86 C114 170,118 250,118 322',w:5,a:'e'},{d:'M119 86 C124 170,130 250,132 318',w:5,a:'e'}],p:[[110,36],[106,180],[132,316]]},
+      hband:{s:[{d:'M76 228 L144 228',w:22,a:'se'}],p:[[78,228],[110,228],[142,228]]}
+    }}
+};
+
+/* ===== 상태 ===== */
+const state = {sport:'마라톤', part:'calf', purpose:'relief', cond:'none', tape:null};
+const $=id=>document.getElementById(id);
+const sportObj=()=>SPORTS.find(s=>s[0]===state.sport);
+const typeKey=()=>sportObj()[1];
+function recParts(){ const s=sportObj(), set=new Set(TYPES[s[1]].order.slice(0,2)); (s[2]||[]).forEach(p=>set.add(p)); return set; }
+const r5=v=>Math.round(v/5)*5;
+const eul=w=>{ const c=w.charCodeAt(w.length-1)-0xAC00; return w+(c>=0&&c%28?'을':'를'); };
+const eun=w=>{ const c=w.charCodeAt(w.length-1)-0xAC00; return w+(c>=0&&c%28?'은':'는'); };
+/* 상태 반영: 통증·피부 자극이 있으면 장력을 낮춘다 */
+function getRule(part=state.part, purpose=state.purpose, tape=state.tape){
+  let prim=RULES[part][purpose], evid=null;
+  if(part==='calf' && (purpose==='relief'||purpose==='prevent')){
+    const b=measuredBest(typeKey());
+    if(b){ evid=b; if(b!=='Y') prim=CALF_MEASURED[purpose][b]; }
+  }
+  const base=(tape && tape!==prim.tape && prim.alt) ? prim.alt : prim, r={...base};
+  r.isPrimary = base===prim; r.evid=evid; r.baseZones=base.zones;
+  r.lowered=false;
+  if(state.cond==='issue' && base.zones){
+    r.zones=base.zones.map(z=>{ if(z[3]===0) return z; const mn=r5(z[2]*0.5), mx=Math.max(mn+5, r5(z[3]*0.6)); return [z[0],z[1],mn,mx,z[4]]; });
+    r.lowered=true;
+  }
+  return r;
+}
+const stretchText=zones=>zones.filter(z=>z[3]>0).map(z=>`${z[4]} ${z[2]}~${z[3]}%`);
+
+/* ===== 1. 선택 ===== */
+function renderInputs(){
+  const tk=typeKey();
+  $('types').innerHTML=Object.entries(TYPES).map(([k,t])=>`<div class="type ${k===tk?'on':''}">
+    <div class="type-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${t.icon}</svg>${t.name}</div>
+    <div class="motion">대표 동작 <b>${MEASURE[k].motion}</b></div>
+    <div class="sps">${SPORTS.filter(s=>s[1]===k).map(([n])=>`<button type="button" class="sp" data-sport="${n}" aria-pressed="${n===state.sport}">${n}</button>`).join('')}</div></div>`).join('');
+  $('typedesc').innerHTML=`<b>${state.sport} · ${TYPES[tk].name}</b> — ${TYPES[tk].desc}`;
+  const rec=recParts(), order=[...TYPES[tk].order].sort((a,b)=>(rec.has(b)-rec.has(a))||TYPES[tk].order.indexOf(a)-TYPES[tk].order.indexOf(b));
+  $('parts').innerHTML=order.map(p=>`<button type="button" class="chip" data-part="${p}" aria-pressed="${p===state.part}">${PARTS[p]}${rec.has(p)?'<span class="tag">추천</span>':''}</button>`).join('');
+  $('purposes').innerHTML=Object.entries(PURPOSES).map(([k,v])=>`<button type="button" class="chip" data-purpose="${k}" aria-pressed="${k===state.purpose}">${v}</button>`).join('');
+  $('conds').innerHTML=Object.entries(CONDS).map(([k,v])=>`<button type="button" class="chip" data-cond="${k}" aria-pressed="${k===state.cond}">${v}</button>`).join('');
+}
+
+/* ===== 2. 추천 결과 ===== */
+function renderResult(){
+  const r=getRule(), sh=SHAPE[r.shape], tk=typeKey(), isS=r.tape==='S';
+  let h='';
+  if(state.cond==='issue') h+=`<div class="warn">통증이나 피부 자극이 있어 ${isS?'피부에 바로 붙이지 않고 언더랩(얇은 보호 랩)을 먼저 감은 뒤 붙이도록':'장력을 한 단계 낮춰'} 추천했다. 붙이기 전 작은 조각으로 30분 정도 피부 반응을 확인하고, 상처 부위는 피한다. 통증이 계속되면 진료를 먼저 받는다.</div>`;
+  const prim=RULES[state.part][state.purpose], hasAlt=!!prim.alt;
+  h+=`<div class="field"><span class="lab">테이프 종류</span><div class="chips">${['K','S'].map(t=>{
+    const ok=t===prim.tape||hasAlt, on=t===r.tape;
+    return `<button type="button" class="chip" data-tape="${t}" aria-pressed="${on}" ${ok?'':'disabled aria-disabled="true" style="opacity:.5;cursor:not-allowed"'}>${t==='K'?'키네시오':'스포츠'}${t===prim.tape?'<span class="tag">추천</span>':''}</button>`; }).join('')}</div>
+    ${hasAlt?'':`<span style="font-size:13px;color:var(--sub)">${noAltReason(state.part,state.purpose,prim.tape==='K'?'S':'K')}</span>`}</div>`;
+  h+=`<div class="k">${PARTS[state.part]} · ${PURPOSES[state.purpose]}${r.isPrimary?'':' · 대안'}</div>`;
+  h+=`<div class="big">${PARTS[state.part]} ${sh.name}</div>`;
+  h+=`<div class="pills"><span class="pill ${isS?'s':''}">${isS?'스포츠(비탄력) 테이프':'키네시오 테이프'}</span><span class="pill s">${isS?'운동 직전 부착 · 운동 후 바로 제거':'3~5일 부착 가능'}</span>${r.evid&&r.isPrimary?'<span class="pill">측정 결과 반영</span>':''}</div>`;
+  const st=r.zones?stretchText(r.zones):[];
+  const orig=r.lowered?stretchText(r.baseZones):null;
+  h+=`<dl class="kv">
+    <dt>장력</dt><dd>${isS?'늘리지 않고 피부에 밀착시켜 단단히 붙인다.':`<span class="mono">${st.join(' · ')}</span>${r.lowered?`<br><span style="color:var(--sub);font-size:13px">원래 추천 ${orig.join(' · ')}에서 낮춤</span>`:''}`}</dd>
+    <dt>방향</dt><dd>${r.dir}</dd>
+    <dt>이유</dt><dd>${r.why}${r.evid&&r.isPrimary?` ${TYPES[tk].name}의 대표 동작인 ${MEASURE[tk].motion} 측정에서 ${MNAME[r.evid]}의 회복률이 ${Math.round(MEASURE[tk].rate[r.evid])}%로 가장 높았다.`:''}</dd></dl>`;
+  $('verdict').innerHTML=h;
+  $('pgridLab').textContent=`${PARTS[state.part]} · 목적별 테이핑`;
+  const line=x=>`${x.tape==='S'?'스포츠':'키네시오'} ${SHAPE[x.shape].name}`;
+  $('pgrid').innerHTML=Object.entries(PURPOSES).map(([k,v])=>{ const x=getRule(state.part,k,null), alt=RULES[state.part][k].alt;
+    return `<div class="pc ${k===state.purpose?'on':''}"><span>${v}</span><b>${line(x)}</b><span class="mono">${x.tape==='S'?'비탄력 · 장력 없음':stretchText(x.zones).map(s=>s.replace(/^.* /,'')).join(' / ')}</span>${alt?`<span>대안: ${line(alt)}</span>`:''}</div>`; }).join('');
+  const rec=recParts().has(state.part);
+  $('typeNote').innerHTML=`<b>${state.sport} · ${TYPES[tk].name}</b> — ${rec?`${eun(PARTS[state.part])} 이 종목에서 부하가 많이 걸리는 부위다.`:`${eun(PARTS[state.part])} 이 종목에서 상대적으로 부하가 적은 부위지만, 통증이나 부상 경험이 있다면 테이핑할 수 있다.`} ${TYPES[tk].tip}`;
+  renderEvidence(r);
+  renderHow(r);
+}
+function hbar(vals, hi, unit){
+  const keys=['None','I','Y','Fan'], W=470, L=66, R=46, bh=18, gap=10, top=6, H=top+keys.length*(bh+gap)+16;
+  const vmax=Math.max(...keys.map(k=>vals[k])), max=Math.max(100, Math.ceil(vmax/50)*50), x=v=>L+(W-L-R)*v/max;
+  const ticks=[0,max/2,max];
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="테이핑 조건별 막대그래프">`;
+  ticks.forEach(t=>{ s+=`<line x1="${x(t)}" x2="${x(t)}" y1="${top-2}" y2="${H-14}" stroke="var(--line)"/><text x="${x(t)}" y="${H-3}" font-size="10" text-anchor="middle" fill="var(--muted)" font-family="var(--f-mono)">${t}</text>`; });
+  keys.forEach((k,i)=>{ const y=top+i*(bh+gap), v=vals[k], w=Math.max(x(v)-L,2), rr=Math.min(4,w);
+    const fill=k===hi?'var(--accent)':(k==='None'?'var(--bar-none)':'var(--bar)');
+    s+=`<g data-tip="${MNAME[k]} · ${v}${unit}"><rect x="${L}" y="${y-4}" width="${W-L}" height="${bh+8}" fill="transparent"/>
+      <text x="${L-8}" y="${y+bh/2+4}" font-size="12" text-anchor="end" fill="var(--sub)">${MNAME[k]}</text>
+      <path d="M${L} ${y} h${w-rr} a${rr} ${rr} 0 0 1 ${rr} ${rr} v${bh-2*rr} a${rr} ${rr} 0 0 1 -${rr} ${rr} h-${w-rr} z" fill="${fill}"/>
+      <text x="${L+w+6}" y="${y+bh/2+4}" font-size="12" fill="var(--ink)" font-family="var(--f-mono)" font-weight="${k===hi?700:500}">${Math.round(v)}${unit}</text></g>`; });
+  return s+`<line x1="${L}" x2="${L}" y1="${top-2}" y2="${H-14}" stroke="var(--sub)"/></svg>`;
+}
+function renderEvidence(r){
+  const tk=typeKey(), m=MEASURE[tk], best=measuredBest(tk);
+  const applied = state.part==='calf' && (state.purpose==='relief'||state.purpose==='prevent') && r.tape==='K';
+  let note;
+  if(!m.valid) note=`${eun(m.motion)} 운동 중 심박수가 충분히 오르지 않아 회복률이 100%를 넘게 계산되었다. 그래서 형태 비교에 쓰지 않고, ${TYPES[tk].name}은 이론 기준으로 추천한다.`;
+  else if(applied) note=`종아리에 키네시오 테이프를 붙이고 ${eul(m.motion)} 3단계로 수행한 측정에서 ${MNAME[best]}의 회복률이 가장 높아, 이번 추천 형태에 반영했다.`;
+  else note=`측정은 종아리 키네시오 테이핑으로 진행했기 때문에, 측정 결과는 종아리의 통증 완화·부상 예방 추천에만 반영된다. 지금 고른 조건은 이론 기준으로 추천했다.`;
+  const tag = !m.valid ? '<span class="pill s">비교 제외</span>' : applied ? '<span class="pill">이 추천에 반영됨</span>' : '<span class="pill s">참고</span>';
+  $('evi').innerHTML=`<div class="evi-h"><span class="lab">측정 결과 근거</span><b>${TYPES[tk].name} 대표 동작 · ${m.motion}</b>${tag}</div>
+    <div class="charts">
+      <div class="chart"><h3>회복률</h3><div class="sub">3단계 운동 직후 → 휴식 1분, 오른 심박수 중 회복된 비율 · 클수록 빠른 회복</div>${hbar(m.rate, best, '%')}</div>
+      <div class="chart"><h3>운동 중 심박수 증가율</h3><div class="sub">처음 심박수 대비 단계별 증가율 평균 · 운동 강도 참고</div>${hbar(m.inc, null, '%')}</div>
+    </div>
+    <p>${note}</p>
+    <span class="cav">조건마다 1회씩 측정한 결과다. 무테이핑은 심박수 증가율이 가장 높아 단순 회복량(HRR)이 크게 나오므로, 운동 강도를 보정한 회복률로 비교했다.</span>`;
+}
+
+/* ===== 3. 부착 방법 ===== */
+function figSVG(r){
+  const f=FIG[state.part], g=f.shapes[r.shape], isS=r.tape==='S', kind=SHAPE[r.shape].kind;
+  let pts=g.p.slice(); if(r.rev) pts=[pts[2],pts[1],pts[0]];
+  const mid=r.zones?stretchText(r.zones).join(' · '):'';
+  let labels=r.labels || (kind==='center' ? [['중앙부터 붙이기','이형지를 가운데서 찢기'],['양쪽으로 늘려 붙이기',mid],['끝 앵커','장력 0%']]
+    : [['시작 앵커','장력 0%'],['늘려 붙이기',mid],['끝 앵커','장력 0%']]);
+  if(r.labels && r.lowered) labels=labels.map(l=>[l[0],l[1].replace(/\d+~\d+%/,stretchText(r.zones)[0]?.replace(/^.* /,'')||'')]);
+  // 라벨 세로 위치: 점 높이를 따르되 서로 겹치지 않게
+  const order=[0,1,2].sort((a,b)=>pts[a][1]-pts[b][1]); const ly=[]; let prev=-1e9;
+  order.forEach(i=>{ const lines=labels[i][1].split(' · ').length; let y=Math.max(pts[i][1], prev+36); y=Math.min(y, 360-(lines-1)*15); ly[i]=y; prev=y+(lines-1)*15; });
+  const main=isS?'var(--tape-s)':'var(--tape)', anc=isS?'var(--tape-s)':'var(--tape-anchor)';
+  let s=`<svg viewBox="0 0 340 384" role="img" aria-label="${PARTS[state.part]} ${SHAPE[r.shape].name} 테이핑 그림">
+  <path d="${f.outline}" fill="var(--skin)" stroke="var(--skin-line)" stroke-width="1.5"/>
+  <path d="${f.deco}" fill="none" stroke="var(--skin-line)" stroke-width="1" opacity=".6"/>
+  <text x="4" y="30" font-size="11" fill="var(--sub)">${f.top}</text><text x="4" y="378" font-size="11" fill="var(--sub)">${f.bottom}</text>`;
+  g.s.forEach(st=>{ let a=st.a; if(r.rev) a=a==='s'?'e':a==='e'?'s':a;
+    if(isS) s+=`<path d="${st.d}" fill="none" stroke="var(--tape-s-line)" stroke-width="${st.w+2}" stroke-linecap="butt"/>`;
+    s+=`<path d="${st.d}" fill="none" stroke="${anc}" stroke-width="${st.w}" stroke-linecap="${isS?'butt':'round'}"/>
+    <path class="tm" data-a="${isS?'':a}" d="${st.d}" fill="none" stroke="${main}" stroke-width="${st.w}" stroke-linecap="butt"/>`; });
+  s+=`<g class="arrows"></g>`;
+  pts.forEach(([x,y],i)=>{ s+=`<line x1="${x+5}" y1="${y}" x2="194" y2="${ly[i]-4}" stroke="var(--sub)" stroke-width="1" stroke-dasharray="3 3"/><circle cx="${x}" cy="${y}" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="1.5"/>
+    <text x="200" y="${ly[i]-2}" font-size="13" font-weight="700" fill="var(--ink)">${'①②③'[i]} ${labels[i][0]}</text>
+    ${labels[i][1].split(' · ').map((t,j)=>`<text x="200" y="${ly[i]+15+j*15}" font-size="11.5" fill="var(--accent-ink)">${t}</text>`).join('')}`; });
+  return s+'</svg>';
+}
+function finishFig(r){
+  const svg=$('partFig').querySelector('svg'), A=26; let out='';
+  const col=r.tape==='S'?'var(--tape-s-line)':'#fff';
+  svg.querySelectorAll('.tm').forEach(p=>{
+    const L=p.getTotalLength(), a=p.dataset.a;
+    if(a==='se') p.setAttribute('stroke-dasharray',`0 ${A} ${L-2*A} ${L}`);
+    else if(a==='s') p.setAttribute('stroke-dasharray',`0 ${A} ${L}`);
+    else if(a==='e') p.setAttribute('stroke-dasharray',`${L-A} ${L}`);
+    const sw=+p.getAttribute('stroke-width'); if(sw<10) return;
+    [0.42,0.64].forEach(f=>{ const p1=p.getPointAtLength(L*f), p2=p.getPointAtLength(L*f+1);
+      let ang=Math.atan2(p2.y-p1.y,p2.x-p1.x)*180/Math.PI; if(r.rev) ang+=180;
+      const k=Math.min(sw*0.28,6); out+=`<path d="M${-k} ${-k} L0 0 L${-k} ${k}" transform="translate(${p1.x} ${p1.y}) rotate(${ang})" fill="none" stroke="${col}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`; });
+  });
+  svg.querySelector('.arrows').innerHTML=out;
+}
+function tensionSVG(r){
+  if(!r.zones) return `<div class="note">비탄력 테이프라 장력을 주지 않는다. 늘리지 않고 피부에 밀착시켜 단단히 붙이되, 피가 통하지 않을 만큼 세게 감지 않는다.</div>`;
+  const W=520,H=190,L=40,R=12,T=26,B=40, x=v=>L+(W-L-R)*v/100, y=v=>T+(H-T-B)*(1-v/80);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="구간별 장력 그래프">`;
+  [0,20,40,60,80].forEach(t=>{ s+=`<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${L-6}" y="${y(t)+4}" font-size="10" text-anchor="end" fill="var(--muted)" font-family="var(--f-mono)">${t}%</text>`; });
+  r.zones.forEach(([a,b,mn,mx,name],i)=>{
+    const anchor=mx===0;
+    s+=`<g data-tip="${name} · ${anchor?'장력 0% (늘리지 않음)':`${mn}~${mx}%`}"><rect x="${x(a)}" y="${T-18}" width="${x(b)-x(a)}" height="${H-T-B+18}" fill="transparent"/>`;
+    if(anchor) s+=`<rect x="${x(a)+1}" y="${y(0)-3}" width="${x(b)-x(a)-2}" height="6" rx="2" fill="var(--tape-anchor)"/>`;
+    else s+=`<rect x="${x(a)+1}" y="${y(mx)}" width="${x(b)-x(a)-2}" height="${Math.max(y(mn)-y(mx),3)}" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text x="${(x(a)+x(b))/2}" y="${y(mx)-6}" font-size="12" font-weight="700" text-anchor="middle" fill="var(--accent-ink)" font-family="var(--f-mono)">${mn}~${mx}%</text>`;
+    s+=`<text x="${(x(a)+x(b))/2}" y="${H-B+16}" font-size="11" text-anchor="middle" fill="var(--sub)">${anchor?'앵커':name}</text></g>`;
+    if(i>0) s+=`<line x1="${x(a)}" x2="${x(a)}" y1="${T}" y2="${H-B}" stroke="var(--line)" stroke-dasharray="2 3"/>`;
+  });
+  s+=`<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--sub)"/>
+    <text x="${L}" y="${H-4}" font-size="11" fill="var(--muted)">${r.from} (시작)</text><text x="${W-R}" y="${H-4}" font-size="11" text-anchor="end" fill="var(--muted)">${r.to} (끝) →</text></svg>`;
+  return s;
+}
+function cutSVG(r){
+  const kind=SHAPE[r.shape].cut, W=520,H=124,x0=20,x1=500,y0=24,y1=74,cm=v=>x0+(x1-x0)*v/38, ym=(y0+y1)/2;
+  const isS=kind==='sport';
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="자르는 법 그림"><defs><marker id="ar" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9" fill="none" stroke="var(--sub)" stroke-width="1.5"/></marker></defs>
+    <rect x="${x0}" y="${isS?y0+6:y0}" width="${x1-x0}" height="${isS?38:y1-y0}" rx="${isS?3:9}" fill="${isS?'var(--tape-s)':'var(--tape)'}" stroke="${isS?'var(--tape-s-line)':'none'}"/>`;
+  const anc=(a,b,l)=>`<rect x="${a}" y="${y0}" width="${b-a}" height="${y1-y0}" fill="var(--tape-anchor)" ${l?'rx="9"':''}/>`;
+  const note=t=>`<text x="${(x0+x1)/2}" y="${y0-8}" font-size="11.5" fill="var(--sub)" text-anchor="middle">${t}</text>`;
+  const ancLabel=`<text x="${x0+8}" y="${ym+4}" font-size="11" fill="var(--accent-ink)" font-weight="700">앵커</text>`;
+  if(kind==='I'||kind==='twoI'||kind==='H'||kind==='X'||kind==='center'){
+    s+=anc(x0,cm(4),1)+anc(cm(34),x1)+ancLabel;
+    const n={I:'',twoI:' · 같은 테이프 2장',H:' · 세로 2장 + 가로 1장',X:' · 2장을 X자로 교차',center:''}[kind];
+    if(kind==='center'||kind==='X') s+=`<line x1="${(x0+x1)/2}" x2="${(x0+x1)/2}" y1="${y0-2}" y2="${y1+2}" stroke="var(--cut)" stroke-width="2.5" stroke-dasharray="4 3"/>`+
+      `<text x="${(x0+x1)/2}" y="${y0-8}" font-size="11.5" fill="var(--cut)" text-anchor="middle">가운데 이형지를 찢고 중앙부터 붙이기${n}</text>`;
+    else s+=note('자르지 않음 · 양 끝 4 cm 앵커'+n);
+  }
+  if(kind==='Y'){ s+=anc(x0,cm(4),1)+ancLabel+`<line x1="${cm(12.7)}" x2="${x1}" y1="${ym}" y2="${ym}" stroke="var(--cut)" stroke-width="2.5" stroke-dasharray="7 5"/>
+    <circle cx="${cm(12.7)}" cy="${ym}" r="4" fill="var(--cut)"/><text x="${cm(12.7)}" y="${y0-8}" font-size="11.5" fill="var(--cut)" text-anchor="middle">여기서부터 세로로 가르기 (약 2/3)</text>`; }
+  if(kind==='Fan'){ s+=anc(x0,cm(5),1)+ancLabel; [1,2,3].forEach(k=>{ const yy=y0+(y1-y0)*k/4; s+=`<line x1="${cm(5)}" x2="${x1}" y1="${yy}" y2="${yy}" stroke="var(--cut)" stroke-width="2" stroke-dasharray="7 5"/>`; });
+    s+=`<text x="${cm(5)}" y="${y0-8}" font-size="11.5" fill="var(--cut)">5 cm 남기고 4등분 (세로로 3번)</text>`; }
+  if(kind==='donut'){ s+=`<ellipse cx="${(x0+x1)/2}" cy="${ym}" rx="70" ry="17" fill="var(--surface)" stroke="var(--cut)" stroke-width="2.5" stroke-dasharray="6 4"/>`+
+    `<text x="${(x0+x1)/2}" y="${y0-8}" font-size="11.5" fill="var(--cut)" text-anchor="middle">가운데를 무릎뼈 크기의 타원으로 오려 내기</text>`; }
+  if(isS) s+=note('폭 3.8 cm 비탄력 테이프 · 늘리지 않음');
+  s+=`<line x1="${x0}" x2="${x1}" y1="${y1+16}" y2="${y1+16}" stroke="var(--sub)" marker-start="url(#ar)" marker-end="url(#ar)"/>
+    <text x="${(x0+x1)/2}" y="${y1+34}" font-size="11.5" text-anchor="middle" fill="var(--sub)">${r.len} (본인 몸에 대고 재기)</text></svg>`;
+  return s;
+}
+function renderHow(r){
+  const sh=SHAPE[r.shape], isS=r.tape==='S', kind=sh.kind;
+  $('h3s').textContent=`부착 방법 · ${PARTS[state.part]} ${sh.name}`;
+  $('figSub').textContent=`${FIG[state.part].view} · 화살표가 붙이는 방향`;
+  $('partFig').innerHTML=figSVG(r); finishFig(r);
+  $('tensionFig').innerHTML=tensionSVG(r);
+  $('cutSub').textContent=isS?'비탄력 테이프 기준':'폭 5 cm 키네시오 테이프 기준';
+  $('cutFig').innerHTML=cutSVG(r);
+  const st=r.zones?stretchText(r.zones).join('<br>'):'';
+  let cards;
+  if(isS) cards=[['자세 잡기',POS[r.pos],''],...r.steps.map(([t,p])=>[t,p,'<span class="val">장력 없음</span>']),['운동 후 제거','운동이 끝나면 바로 뗀다. 오래 붙여 두지 않는다.','']];
+  else if(kind==='center') cards=[['자세 잡기',POS[r.pos],''],['중앙부터 붙이기','테이프 가운데 이형지를 찢어 '+r.from+'에 중앙을 댄다.',''],['양쪽으로 늘려 붙이기','양 끝을 잡고 바깥쪽으로 늘리며 붙인다.',`<span class="val">${st}</span>`],['끝 앵커','양 끝 3~5 cm는 늘리지 않고 붙인다.','<span class="val">장력 0%</span>'],['문지르고 기다리기','손바닥으로 여러 번 문질러 접착력을 높이고 20~30분 뒤 운동한다.','<span class="val">3~5일 부착 가능</span>']];
+  else if(kind==='ring') cards=[['자세 잡기',POS[r.pos],''],['시작',r.from+'에서 끝을 늘리지 않고 붙인다.','<span class="val">장력 0%</span>'],['둘레 따라 붙이기','무릎뼈를 가운데 두고 둘레를 따라 붙인다.',`<span class="val">${st}</span>`],['마무리','한 바퀴 돌아와 시작 부분과 살짝 겹친다.','<span class="val">장력 0%</span>'],['문지르고 기다리기','손바닥으로 여러 번 문질러 접착력을 높이고 20~30분 뒤 운동한다.','<span class="val">3~5일 부착 가능</span>']];
+  else cards=[['자세 잡기',POS[r.pos],''],['시작 앵커',r.from+' 쪽에 끝 3~5 cm를 늘리지 않고 얹듯이 붙인다.','<span class="val">장력 0%</span>'],['늘려 붙이기',r.dir,`<span class="val">${st}</span>`],['끝 앵커',r.to+' 쪽 마지막 3~5 cm는 늘리지 않고 붙인다.','<span class="val">장력 0%</span>'],['문지르고 기다리기','손바닥으로 여러 번 문질러 접착력을 높이고 20~30분 뒤 운동한다.','<span class="val">3~5일 부착 가능</span>']];
+  $('steps').innerHTML=cards.map(([t,p,x],i)=>`<div class="st"><span class="n">${i+1}</span><b>${t}</b>${x}<p>${p}</p></div>`).join('');
+  const url=MANUAL_URL[`${state.part}-${r.shape}`], b=$('manualBtn');
+  b.textContent=`${PARTS[state.part]} ${sh.name} 부착 방법 보기`;
+  if(url){ b.href=url; b.removeAttribute('aria-disabled'); $('manualNote').textContent='스마트 매뉴얼(구글 사이트)로 이동한다.'; }
+  else { b.href='#'; b.setAttribute('aria-disabled','true'); $('manualNote').textContent=`매뉴얼 주소를 코드 맨 위 MANUAL_URL의 '${state.part}-${r.shape}' 칸에 넣으면 연결된다.`; }
+}
+$('manualBtn').addEventListener('click',e=>{ if($('manualBtn').getAttribute('aria-disabled')==='true') e.preventDefault(); });
+
+/* ===== 이벤트 ===== */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-sport],[data-part],[data-purpose],[data-cond],[data-tape]'); if(!b||b.disabled) return;
+  if(b.dataset.tape){ state.tape=b.dataset.tape; renderResult(); return; }
+  if(b.dataset.sport) state.sport=b.dataset.sport;
+  if(b.dataset.part){ state.part=b.dataset.part; state.tape=null; }
+  if(b.dataset.purpose){ state.purpose=b.dataset.purpose; state.tape=null; }
+  if(b.dataset.cond) state.cond=b.dataset.cond;
+  renderInputs(); renderResult();
+});
+const tip=$('tip');
+document.addEventListener('pointermove',e=>{
+  const g=e.target.closest&&e.target.closest('[data-tip]');
+  if(!g){ tip.hidden=true; return; }
+  tip.textContent=g.dataset.tip; tip.hidden=false;
+  tip.style.left=Math.min(e.clientX+12, innerWidth-tip.offsetWidth-8)+'px'; tip.style.top=(e.clientY+14)+'px';
+});
+renderInputs(); renderResult();
+</script>
